@@ -1,0 +1,27 @@
+#cloud-config
+---
+packages:
+  - python
+  - awscli
+  - python-pip
+  - vim
+  - bind-utils
+  - tcpdump
+  - botocore
+
+preserve_hostname: true
+
+bootcmd:
+  - hostnamectl set-hostname ${HOSTNAME}
+
+runcmd:
+  - yum install -y epel-release
+  - yum -y install python-pip
+  - pip install --upgrade pip awscli boto3
+  - aws s3 cp s3://sitebridge-rpms/awser.py /home/centos/
+  - aws s3 cp s3://sitebridge-rpms/aws_sb_poc.pem /home/centos/
+  - chmod 400 /home/centos/aws_sb_poc.pem
+  - echo "alias awser=\"python awser.py -u centos -i aws_sb_poc.pem\" " >> /root/.bashrc
+  - source /root/.bashrc
+
+output: { all: "| tee -a /var/log/cloud-init-output.log" }
