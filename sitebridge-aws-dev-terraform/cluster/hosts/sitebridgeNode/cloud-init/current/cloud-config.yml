@@ -1,0 +1,409 @@
+#cloud-config
+---
+packages:
+  - python
+  - botocore
+  - awscli
+  - python-pip
+  - vim
+  - bind-utils
+  - tcpdump
+  - iperf3
+
+preserve_hostname: true
+
+bootcmd:
+  - hostnamectl set-hostname ${HOSTNAME}
+
+runcmd:
+  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+  - python get-pip.py
+  - pip install -U pip
+  - pip install botocore
+  - pip install ipaddr
+  - yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux docker-engine-selinux docker-engine
+  - export ETCDCTL_API=3
+  - mkdir -p /etc/sitebridge
+  - mkdir -p /etc/sitebridge/docker
+  - sh /home/centos/addRepos.sh
+  - yum install -y etcd
+  - yum install -y awscli
+  - aws s3 cp s3://sitebridge-rpms/docker-ce-18.06.0.ce-3.el7.x86_64.rpm /etc/sitebridge
+  - yum install -y /etc/sitebridge/docker-ce-18.06.0.ce-3.el7.x86_64.rpm
+  - mkdir -p /cowdata/docker
+  - mkdir -p /etc/docker
+  - mkdir -p /etc/docker/certs.d
+  - mkdir -p /var/run/docker
+  - chmod 0755 /var/run/docker
+  - mkdir -p /var/run/docker/containerd
+  - chmod 0755 /var/run/docker/containerd
+  - systemctl enable containerd-docker
+  - systemctl start containerd-docker
+  - systemctl enable docker
+  - systemctl start docker
+  - aws s3 cp s3://sitebridge-rpms/openvswitch-2.7.3-1.1fc27.el7.x86_64.rpm /etc/sitebridge
+  - aws s3 cp s3://sitebridge-rpms/sfdc-python27-absl-py-0.2.2-2018.05a.233.el7.noarch.rpm /etc/sitebridge
+  - yum localinstall -y /etc/sitebridge/openvswitch-2.7.3-1.1fc27.el7.x86_64.rpm
+  - yum localinstall -y /etc/sitebridge/sfdc-python27-absl-py-0.2.2-2018.05a.233.el7.noarch.rpm
+  - systemctl start openvswitch
+  - systemctl enable openvswitch
+  - ovs-vsctl show
+  - yum install -y openswan
+  - mkdir -p /etc/sitebridge/openswan
+  - mkdir -p /etc/sitebridge/ipsec.d
+  - sh /etc/sitebridge/openswan/openswan-setup.sh
+  - systemctl restart ipsec
+  - ipsec verify
+  - ipsec status
+  - sh /etc/sitebridge/pull-latest-sitebridge-manifest.sh
+  - sh /etc/sitebridge/docker-login.sh
+  - sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+  - docker pull ${SITEBRIDGE_BOOTSTRAPPER_IMAGE}
+  - systemctl start sitebridge-bootstrapper.service
+  - systemctl enable sitebridge-bootstrapper.service
+
+output: { all: "| tee -a /var/log/cloud-init-output.log" }
+write_files:
+  -   content: |
+        root = "/cowdata/docker/containerd/daemon"
+        state = "/var/run/docker/containerd/daemon"
+        oom_score = -500
+        disabled_plugins = ["cri"]
+
+        [grpc]
+          address = "/var/run/docker/containerd/docker-containerd.sock"
+          uid = 0
+          gid = 0
+          max_recv_message_size = 16777216
+          max_send_message_size = 16777216
+
+        [debug]
+          address = "/var/run/docker/containerd/docker-containerd-debug.sock"
+          uid = 0
+          gid = 0
+          level = "info"
+
+        [metrics]
+          address = ""
+          grpc_histogram = false
+
+        [cgroup]
+          path = ""
+
+        [plugins]
+          [plugins.linux]
+            shim = "docker-containerd-shim"
+            runtime = "docker-runc"
+            runtime_root = "/cowdata/docker/runc"
+            no_shim = false
+            shim_debug = false
+      path: /etc/sitebridge/docker/containerd.toml
+      permissions: '0644'
+  -   content: |
+        [Unit]
+        Description=Containerd Container Runtime
+        After=network.target
+        PartOf=docker.service
+
+        [Service]
+        Type=simple
+        ExecStartPre=/sbin/modprobe overlay
+        ExecStart=/usr/bin/docker-containerd --config /etc/sitebridge/docker/containerd.toml
+        Delegate=yes
+        KillMode=process
+
+        [Install]
+        WantedBy=multi-user.target
+      path: /etc/systemd/system/containerd-docker.service
+      permissions: '0644'
+  -   content: |
+        # /etc/systemd/system/docker.socket in kubernetes-master module
+        # This file overrides the default /usr/lib/systemd/system/docker.socket
+        # that comes from the Docker RPM (Docker flavor only, Red Hat doesn't have it).
+        # SocketGroup set as root because no other accounts need access for now.
+        [Unit]
+        Description=Docker Socket for the API
+        PartOf=docker.service
+
+        [Socket]
+        ListenStream=/var/run/docker.sock
+        SocketMode=0660
+        SocketUser=root
+        SocketGroup=root
+
+        [Install]
+        WantedBy=sockets.target
+      path: /etc/systemd/system/docker.socket
+      permissions: '0644'
+  -   content: |
+        # /etc/systemd/system/docker.service with overlay
+        # This file overrides the default /usr/lib/systemd/system/docker.service
+        # that comes from the Docker RPM (both Red Hat and Docker flavors).
+        # The contents here are modeled after the simpler stock Docker RPM, not the Red
+        # Hat RPM, which puts configuration out to /etc/sysconfig and pulls in Red Hat's
+        # docker-storage-setup.service.
+        [Unit]
+        Description=Docker Application Container Engine
+        Documentation=http://docs.docker.com
+        Requires=containerd-docker.service docker.socket
+        After=network.target containerd-docker.service docker.socket
+
+        [Service]
+        Type=notify
+        ExecStart=\
+            /usr/bin/dockerd \
+            -H unix:///var/run/docker.sock \
+            --exec-opt native.cgroupdriver=systemd \
+            --storage-driver=overlay2 \
+            --storage-opt=overlay2.override_kernel_check=true \
+            --data-root=/cowdata/docker \
+            --containerd=/var/run/docker/containerd/docker-containerd.sock \
+            --tlscacert=/etc/docker/ca.pem \
+            --tlscert=/etc/docker/cert.pem \
+            --tlskey=/etc/docker/key.pem \
+            --log-driver=journald \
+            --ip-masq=false
+        LimitNOFILE=1048576
+        LimitNPROC=1048576
+        LimitCORE=infinity
+        TimeoutStartSec=0
+        Restart=always
+        RestartSec=1
+        StartLimitInterval=10min
+        StartLimitBurst=1000
+        # set delegate yes so that systemd does not reset the cgroups of docker containers
+        Delegate=yes
+        # kill only the docker process, not all processes in the cgroup
+        KillMode=process
+
+        [Install]
+        WantedBy=multi-user.target
+      path: /etc/systemd/system/docker.service
+      permissions: '0644'
+  -   content: |
+        #!/usr/bin/env bash
+        echo "logging into docker"
+        command=$(aws ecr get-login --no-include-email --region us-west-2)
+        eval $command
+      path: /etc/sitebridge/docker-login.sh
+      permissions: '0755'
+  -   content: |
+        SITEBRIDGE_BOOTSTRAPPER_IMAGE=${SITEBRIDGE_BOOTSTRAPPER_IMAGE}
+        KINGDOM=${kingdom_name}
+        ARCHIVE_SVC_ENDPOINT=${ARCHIVE_SVC_ENDPOINT}
+        INSECURE_TLS=${INSECURE_TLS}
+        LIVENESS_PROBE_PORT=${LIVENESS_PROBE_PORT}
+        PLATFORM=${platform_name}
+      path: /etc/sitebridge/sitebridge-bootstrapper.env
+  -   content: |
+        {
+            "insecure-registries" : [
+                "ops0-artifactrepo1-0-xrd.data.sfdc.net",
+                "ops0-artifactrepo1-0-prd.data.sfdc.net"
+            ]
+        }
+      path: /etc/docker/daemon.json
+  -   content: |
+        # My new /etc/sysconfig/samba file
+        [Unit]
+        Description=Bootstrapper service for bringing up sitebridge components
+        After=network.target docker.service
+        Requires=docker.service
+
+        [Service]
+        EnvironmentFile=/etc/sitebridge/sitebridge-bootstrapper.env
+        ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker.sock kill sitebridge-bootstrapper
+        ExecStartPre=-/usr/bin/docker -H unix:///var/run/docker.sock rm sitebridge-bootstrapper
+        ExecStartPre=-/usr/bin/bash -c '[ -f /etc/sitebridge/docker-login.sh ] && /etc/sitebridge/docker-login.sh'
+        ExecStart=/usr/bin/docker -H unix:///var/run/docker.sock run \
+            --rm \
+            --name=sitebridge-bootstrapper \
+            --net=host --privileged --cap-add=NET_ADMIN \
+            -v /etc/sitebridge:/etc/sitebridge \
+            -v /etc/sitebridge:/usr/local/var/run \
+            -v /etc/systemd/system:/etc/systemd/system \
+            -v /run/systemd:/run/systemd \
+            -v /usr/bin/docker:/usr/bin/docker \
+            -v /usr/bin/docker-current:/usr/bin/docker-current \
+            -v /etc/sysconfig/docker:/etc/sysconfig/docker \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /usr/bin/systemctl:/usr/bin/systemctl \
+            -v /etc/pki_service:/etc/pki_service \
+            -v /etc/ipsec.d:/etc/ipsec.d \
+            --entrypoint /sitebridge/sitebridge-bootstrapper \
+            $${SITEBRIDGE_BOOTSTRAPPER_IMAGE} \
+            --archiveSvcEndpoint=$${ARCHIVE_SVC_ENDPOINT} \
+            --kingdom=$${KINGDOM} \
+            --platform=$${PLATFORM} \
+            --insecureTLS=$${INSECURE_TLS} \
+            --grpcLivenessProbePort=$${LIVENESS_PROBE_PORT} \
+            --grpcServerCertificate=/etc/pki_service/root/sitebridge-server/certificates/sitebridge-server.pem \
+            --grpcServerKey=/etc/pki_service/root/sitebridge-server/keys/sitebridge-server-key.pem \
+            --grpcCaCertificate=/etc/pki_service/ca/cacerts.pem
+
+        ExecStop=-/usr/bin/docker stop sitebridge-bootstrapper
+        LimitNOFILE=1048576
+        LimitNPROC=1048576
+        LimitCORE=infinity
+        TimeoutStartSec=100s
+        Restart=always
+        RestartSec=1
+        StartLimitInterval=10min
+        StartLimitBurst=1000
+
+        [Install]
+        WantedBy=multi-user.target
+      path: /etc/systemd/system/sitebridge-bootstrapper.service
+  -   content: |
+        #!/usr/bin/env bash
+        iptables -A FORWARD -j ACCEPT
+
+        sysctl_conf=/etc/sysctl.d/99-sysctl.conf
+        cat >> $sysctl_conf << EOF
+        net.ipv4.ip_forward = 1
+        net.ipv4.conf.all.forwarding = 1
+
+        net.ipv4.conf.all.accept_redirects = 0
+        net.ipv4.conf.all.rp_filter = 0
+        net.ipv4.conf.all.send_redirects = 0
+
+        net.ipv4.conf.default.accept_redirects = 0
+        net.ipv4.conf.default.accept_source_route = 0
+        net.ipv4.conf.default.rp_filter = 0
+        net.ipv4.conf.default.send_redirects = 0
+
+        net.ipv4.conf.docker0.rp_filter = 0
+
+        net.ipv4.conf.eth0.accept_redirects = 0
+        net.ipv4.conf.eth0.rp_filter = 0
+        net.ipv4.conf.eth0.send_redirects = 0
+
+        net.ipv4.conf.ip_vti0.accept_redirects = 0
+        net.ipv4.conf.ip_vti0.rp_filter = 0
+        net.ipv4.conf.ip_vti0.send_redirects = 0
+
+        net.ipv4.conf.lo.rp_filter = 0
+        net.ipv4.conf.lo.send_redirects = 0
+        net.ipv4.conf.lo.accept_redirects = 0
+        EOF
+        sysctl -p
+      path: /etc/sitebridge/openswan/openswan-setup.sh
+      permissions: '0755'
+  -   content: |
+        #!/usr/bin/env bash
+        # relative sitebridge manifest latest url.
+        relative_sitebridge_path=tnrp/content_repo/0/archive/sitebridge-manifests
+        relative_latest_path=$relative_sitebridge_path/latest
+
+        # Source: tnrp endpoint details
+        tnrp_root=https://ops0-piperepo1-1-prd.eng.sfdc.net
+        tnrp_latest_file=$tnrp_root/$relative_latest_path
+
+        # Destination: s3 endpoint details
+        s3_bucket=s3://sitebridge-tnrp-beta
+        s3_latest_file=$s3_bucket/$relative_latest_path
+
+        local_manifest_dir=/etc/sitebridge/manifests
+        mkdir -p $local_manifest_dir
+        s3_exists=$(aws s3 ls $s3_latest_file)
+        if [ -z "$s3_exists" ]; then
+          echo "s3 latest file doesn't exist"
+        else
+          # download latest file from s3
+          aws s3 cp $s3_latest_file $local_manifest_dir/latest
+        fi
+
+        # As contents have changed upload the latest artifacts from tnrp to s3 endpoint.
+        # cut -s -d ':' splits the string with delimiter as colon
+        # tr -d ' ' removes all occurrence of space from the given string
+        # tr -d '"' remotes all occurrence of quote from the given string
+        latestContent=$(cat $local_manifest_dir/latest)
+        echo "latest manifest: $latestContent"
+        echo ""
+        latest_url=$( cut -s -d ':' -f2  < $local_manifest_dir/latest | tr -d '}' | tr -d ' ' | tr -d '"' )
+        echo "latest url : $latest_url"
+        manifest_download=$latest_url
+        aws s3 cp $s3_bucket/$manifest_download $local_manifest_dir/latest.zip
+      path: /etc/sitebridge/pull-latest-sitebridge-manifest.sh
+      permissions: '0755'
+  -   content: |
+        cat > /etc/yum.repos.d/CentOS-Base.repo << "EOF"
+        # CentOS-Base.repo
+        [base]
+        name=CentOS-$releasever - Base
+        mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra
+        #baseurl=http://mirror.centos.org/centos/$releasever/os/$basearch/
+        gpgcheck=1
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #released updates
+        [updates]
+        name=CentOS-$releasever - Updates
+        mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=updates&infra=$infra
+        #baseurl=http://mirror.centos.org/centos/$releasever/updates/$basearch/
+        gpgcheck=1
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #additional packages that may be useful
+        [extras]
+        name=CentOS-$releasever - Extras
+        mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=extras&infra=$infra
+        #baseurl=http://mirror.centos.org/centos/$releasever/extras/$basearch/
+        gpgcheck=1
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #additional packages that extend functionality of existing packages
+        [centosplus]
+        name=CentOS-$releasever - Plus
+        mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=centosplus&infra=$infra
+        #baseurl=http://mirror.centos.org/centos/$releasever/centosplus/$basearch/
+        gpgcheck=1
+        enabled=0
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+        EOF
+
+        cat > /etc/yum.repos.d/CentOS-CR.repo << "EOF"
+        # CentOS-CR.repo
+        [cr]
+        name=CentOS-$releasever - cr
+        baseurl=http://mirror.centos.org/centos/$releasever/cr/$basearch/
+        gpgcheck=1
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+        enabled=0
+        EOF
+
+        cat > /etc/yum.repos.d/CentOS-Sources.repo << "EOF"
+        # CentOS-Sources.repo
+        [base-source]
+        name=CentOS-$releasever - Base Sources
+        baseurl=http://vault.centos.org/centos/$releasever/os/Source/
+        gpgcheck=1
+        enabled=0
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #released updates
+        [updates-source]
+        name=CentOS-$releasever - Updates Sources
+        baseurl=http://vault.centos.org/centos/$releasever/updates/Source/
+        gpgcheck=1
+        enabled=0
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #additional packages that may be useful
+        [extras-source]
+        name=CentOS-$releasever - Extras Sources
+        baseurl=http://vault.centos.org/centos/$releasever/extras/Source/
+        gpgcheck=1
+        enabled=0
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+        #additional packages that extend functionality of existing packages
+        [centosplus-source]
+        name=CentOS-$releasever - Plus Sources
+        baseurl=http://vault.centos.org/centos/$releasever/centosplus/Source/
+        gpgcheck=1
+        enabled=0
+        gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+        EOF
+      path: /home/centos/addRepos.sh
+      permissions: '0755'

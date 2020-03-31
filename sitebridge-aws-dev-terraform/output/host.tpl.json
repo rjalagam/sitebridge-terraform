@@ -1,0 +1,9 @@
+{
+  "name": "${name}",
+  "ip": "${ip}",
+  "publicip": "${publicip}",
+  "instanceId": "${instanceId}",
+  "sitebridgeName": "${sitebridgeName}",
+  "provider" : "${provider}",
+  "region"   : "${region}"
+}
