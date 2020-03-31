@@ -13,5 +13,5 @@ module "sb-us-west-2-customer" {
 }
 
 variable "instance_type" {
-  default = "c4.xlarge"
+  default = "c5.4xlarge"
 }

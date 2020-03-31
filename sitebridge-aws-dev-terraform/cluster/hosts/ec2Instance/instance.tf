@@ -24,7 +24,7 @@ variable "base_instance_types" {
   type = "map"
 
   default = {
-    us-west-2 = "c4.xlarge" # TODO: Verify instance type
+    us-west-2 = "c5.4xlarge"
   }
 }
 

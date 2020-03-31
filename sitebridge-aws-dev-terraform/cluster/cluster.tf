@@ -56,7 +56,7 @@ variable "instanceNamePrefix" {}
 variable "instanceNameSuffix" {}
 
 variable "instance_type" {
-  default = "c4.xlarge"
+  default = "c5.4xlarge"
 }
 
 variable "instanceTypeList" {
