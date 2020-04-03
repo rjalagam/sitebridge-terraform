@@ -108,9 +108,7 @@ resource "aws_network_acl_rule" "subnet-0-nacl-ingress-allow-all" {
 resource "aws_network_acl" "subnet-1-network-acl" {
   vpc_id = "${aws_vpc.sitebridge-vpc.id}"
 
-  subnet_ids = [
-    "${module.subnet-1.subnetID}",
-  ]
+  subnet_ids = "${module.subnet-1.subnetID}"
 
   tags {
     Name = "sitebridge-dev-aws-usw2-vpc1-subnet1-network-acl"

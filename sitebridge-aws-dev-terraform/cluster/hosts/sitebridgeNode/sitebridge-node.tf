@@ -35,6 +35,7 @@ module "sitebridge-node-instance" {
   source_dest_check           = false
   cloudInitFolder             = "${var.cloudInitFolder}"
   externalIPs                 = "${var.externalIPs}"
+  privateIPs                  = "${var.privateIPs}"
   instanceNamePrefix          = "${var.instanceNamePrefix}"
   instanceNameSuffix          = "${var.instanceNameSuffix}"
 
@@ -85,6 +86,10 @@ variable "vpcSecurityGroupIds" {
 }
 
 variable "externalIPs" {
+  type = "list"
+}
+
+variable "privateIPs" {
   type = "list"
 }
 
