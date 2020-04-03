@@ -34,20 +34,15 @@ variable "aws_usw2_sb_{{cluster_name}}1_input" {
   }
 }
 
-// This should have the same number of static external ip name as there are number of instances in the cluster
-variable "aws_usw2_sb_{{cluster_name}}1_external_ips" {
-  type = "list"
-
-  default = [
-    "34.222.66.211",
-  ]
-}
-
 variable "aws_usw2_sb_{{cluster_name}}1_ami_list" {
   type = "list"
 
   default = [
-    "{{ami_type}}"
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
   ]
 }
 
@@ -56,6 +51,10 @@ variable "aws_usw2_sb_{{cluster_name}}1_instance_type_list" {
 
   default = [
     "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
   ]
 }
 
@@ -63,7 +62,16 @@ variable "aws_usw2_sb_{{cluster_name}}1_cloud_init_folder" {
   type = "list"
 
   default = [
-    "current",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
   ]
 }
 
@@ -79,7 +87,6 @@ module "aws_usw2_sb_{{cluster_name}}1" {
   resourceName       = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.resourceName]}"
   sitebridge         = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.sitebridge]}"
   sitebridgeImage    = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.sitebridgeImage]}"
-  externalIPs        = "${var.aws_usw2_sb_{{cluster_name}}1_external_ips}"
   cloudInitFolder    = "${var.aws_usw2_sb_{{cluster_name}}1_cloud_init_folder}"
 
   platformName           = "${var.platformName}"
