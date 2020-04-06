@@ -1,0 +1,111 @@
+############################################################################################################################################
+# Create Sitebridge Clusters Inside Subnet-1
+##################################################################################################
+locals {
+  instanceNamePrefix = "instanceNamePrefix"
+  instanceNameSuffix = "instanceNameSuffix"
+  instanceType       = "instanceType"
+  kingdom            = "kingdom"
+  numInstances       = "numInstances"
+  resourceName       = "resourceName"
+  sitebridge         = "sitebridge"
+  sitebridgeImage    = "sitebridgeImage"
+}
+
+############################################################################################################################################
+# 1. Create Sitebridge Cluster: aws_usw2_sb_{{cluster_name}}
+#    local  sitebridge     : aws-usw2-sb-{{cluster_name}}
+#    local  kingdom        : aws-usw2-cust-{{cluster_name}}
+#    instance name pattern : sitebridge1--usw2-eng.awssb.sfdcsb.net
+########################################################################
+variable "aws_usw2_sb_{{cluster_name}}1_input" {
+  type = "map"
+
+  default = {
+    "instanceNamePrefix" = "sitebridge1"
+    "instanceNameSuffix" = "{{cluster_name}}.usw2.awssb.sfdcsb.net"
+    "kingdom"            = "aws-usw2-cust-{{cluster_name}}"
+    "numInstances"       = "{{num_instances}}"
+    "resourceName"       = "aws-usw2-sb-{{cluster_name}}1"
+    "remoteSitebridge"   = "prd1"
+    "remoteKingdom"      = "prd1"
+    "sitebridge"         = "aws-usw2-sb-{{cluster_name}}"
+    "sitebridgeImage"    = "099350349688.dkr.ecr.us-west-2.amazonaws.com/sitebridge:cloud-latest"
+  }
+}
+
+variable "aws_usw2_sb_{{cluster_name}}1_ami_list" {
+  type = "list"
+
+  default = [
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
+    "{{ami_type}}",
+  ]
+}
+
+variable "aws_usw2_sb_{{cluster_name}}1_instance_type_list" {
+  type = "list"
+
+  default = [
+    "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
+    "{{instance_type}}",
+  ]
+}
+
+variable "aws_usw2_sb_{{cluster_name}}1_cloud_init_folder" {
+  type = "list"
+
+  default = [
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+    "{{cloud_init_provider}}",
+  ]
+}
+
+module "aws_usw2_sb_{{cluster_name}}1" {
+  source = "../cluster"
+
+  instanceTypeList   = "${var.aws_usw2_sb_{{cluster_name}}1_instance_type_list}"
+  amiList            = "${var.aws_usw2_sb_{{cluster_name}}1_ami_list}"
+  instanceNamePrefix = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.instanceNamePrefix]}"
+  instanceNameSuffix = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.instanceNameSuffix]}"
+  kingdom            = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.sitebridge]}"
+  numInstances       = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.numInstances]}"
+  resourceName       = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.resourceName]}"
+  sitebridge         = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.sitebridge]}"
+  sitebridgeImage    = "${var.aws_usw2_sb_{{cluster_name}}1_input[local.sitebridgeImage]}"
+  cloudInitFolder    = "${var.aws_usw2_sb_{{cluster_name}}1_cloud_init_folder}"
+
+  platformName           = "${var.platformName}"
+  subnet_id              = "${module.subnet-1.subnetID}"
+  vpc_id                 = "${aws_vpc.sitebridge-vpc.id}"
+  igw_id                 = "${aws_internet_gateway.sitebridge-vpc-internet-gateway.id}"
+  natpool_cidr_block     = "${var.vpcNatPoolCidrBlock}"
+  vpc_security_group_ids = ["${aws_security_group.subnet-1-security-group.id}"]
+}
+
+output "aws_usw2_sb_{{cluster_name}}1_output_hosts" {
+  value = "${module.aws_usw2_sb_{{cluster_name}}1.sb_hosts_info}"
+}
+
+module "aws_usw2_sb_{{cluster_name}}1_s3" {
+  source       = "../output"
+  region       = "${var.region}"
+  cluster_info = "${var.aws_usw2_sb_{{cluster_name}}1_input}"
+  hosts_info   = "${module.aws_usw2_sb_{{cluster_name}}1.sb_hosts_info}"
+}
+
+variable "instance_type" {}
