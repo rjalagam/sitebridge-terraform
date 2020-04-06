@@ -10,6 +10,21 @@ variable "cluster_info" {
 }
 
 variable "region" {}
+variable "instanceNamePrefix" {}
+variable "instanceNameSuffix" {}
+variable "numInstances" {}
+
+variable "privateIPs" {
+  type = "list"
+
+  default = []
+}
+
+variable "publicIPs" {
+  type = "list"
+
+  default = []
+}
 
 variable "hosts_info" {
   type = "map"
@@ -59,5 +74,22 @@ data "template_file" "hosts" {
 
   vars {
     hosts = "${join(",", data.template_file.host.*.rendered)}"
+  }
+}
+
+// tagging for EIPs used for this build
+data "external" "set_tags" {
+  program = ["sh", "${path.root}/describe_eip.sh"]
+
+  query = {
+    # arbitrary map from strings to strings, passed
+    # to the external program as the data query.
+    public_ips  = "${var.publicIPs}"
+    private_ips = "{var.privateIPs}"
+    count       = "${var.numInstances}"
+    prefix_name = "${var.instanceNamePrefix}"
+    suffix_name = "${var.instanceNameSuffix}"
+    region      = "${var.region}"
+    set_tags    = "1"
   }
 }
