@@ -136,8 +136,9 @@ data "external" "get_ips" {
     # to the external program as the data query.
     public_ips   = "${var.externalIPs}"
     private_ips  = ""
-    prefix_name  = "${instanceNamePrefix}"
-    suffix_name  = "${instanceNameSuffix}"
+    count        = "${var.numInstances}"
+    prefix_name  = "${var.instanceNamePrefix}"
+    suffix_name  = "${var.instanceNameSuffix}"
     region       = "${var.region}"
     set_tags     = "0"
   }

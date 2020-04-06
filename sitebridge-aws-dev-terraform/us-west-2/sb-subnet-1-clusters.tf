@@ -58,18 +58,24 @@ variable "aws_usw2_sb_cnitest1_cloud_init_folder" {
   ]
 }
 
+locals {
+  instanceNamePrefix = "${var.aws_usw2_sb_cnitest1_input[local.instanceNamePrefix]}"
+  instanceNameSuffix = "${var.aws_usw2_sb_cnitest1_input[local.instanceNameSuffix]}"
+  sitebridge         = "${var.aws_usw2_sb_cnitest1_input[local.sitebridge]}"
+}
+ 
 module "aws_usw2_sb_cnitest1" {
   source = "../cluster"
 
   region             = "${var.region}"
   instanceTypeList   = "${var.aws_usw2_sb_cnitest1_instance_type_list}"
   amiList            = "${var.aws_usw2_sb_cnitest1_ami_list}"
-  instanceNamePrefix = "${var.aws_usw2_sb_cnitest1_input[local.instanceNamePrefix]}"
-  instanceNameSuffix = "${var.aws_usw2_sb_cnitest1_input[local.instanceNameSuffix]}"
+  instanceNamePrefix = "${local.instanceNamePrefix}"
+  instanceNameSuffix = "${local.instanceNameSuffix}"
   kingdom            = "${var.aws_usw2_sb_cnitest1_input[local.sitebridge]}"
   numInstances       = "${var.aws_usw2_sb_cnitest1_input[local.numInstances]}"
   resourceName       = "${var.aws_usw2_sb_cnitest1_input[local.resourceName]}"
-  sitebridge         = "${var.aws_usw2_sb_cnitest1_input[local.sitebridge]}"
+  sitebridge         = "${local.sitebridge}"
   sitebridgeImage    = "${var.aws_usw2_sb_cnitest1_input[local.sitebridgeImage]}"
   cloudInitFolder    = "${var.aws_usw2_sb_cnitest1_cloud_init_folder}"
 
@@ -86,8 +92,14 @@ output "aws_usw2_sb_cnitest1_output_hosts" {
 }
 
 module "aws_usw2_sb_cnitest1_s3" {
-  source       = "../output"
-  region       = "${var.region}"
-  cluster_info = "${var.aws_usw2_sb_cnitest1_input}"
-  hosts_info   = "${module.aws_usw2_sb_cnitest1.sb_hosts_info}"
+  source             = "../output"
+  hosts_info         = "${module.aws_usw2_sb_cnitest1.sb_hosts_info}"
+  region             = "${var.region}"
+  cluster_info       = "${var.aws_usw2_sb_cnitest1_input}"
+  publicIPs          = "${module.sitebridgeNode.public_ip_addresses}" //use output from build
+  privateIPs         = "${module.sitebridgeNode.private_ip_addresses}" //use output from build
+  sitebridge         = "${local.sitebridge}"
+  instanceNamePrefix = "${local.instanceNamePrefix}"
+  instanceNameSuffix = "${local.instanceNameSuffix}"
+  numInstances       = "${var.numInstances}"
 }

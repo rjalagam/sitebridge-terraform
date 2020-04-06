@@ -66,7 +66,7 @@ get_tagged_ips_from_aws()
 
     # Loop through the instance count and get the list of eips attached based on the filter name
     for (( i=1; i<=$((count+0)); i++ )); do
-        host_name="$prefix_name-$i$suffix_name"
+        host_name="$prefix_name-$i-$suffix_name"
 
         desc_addresses_cmd="aws ec2 describe-addresses --region $region"
         desc_addresses_cmd+=" --filters Name=tag:Name,Values=$host_name --output json | jq '.Addresses[] | "
@@ -119,7 +119,7 @@ set_tags_eip()
     array_count=${#public_ips_array[@]}
 
     for (( i=1; i<=$((count+0)); i++ )); do
-        host_name="$prefix_name-$i$suffix_name"
+        host_name="$prefix_name-$i-$suffix_name"
         desc_addresses_cmd="aws ec2 describe-addresses --region $region"
         desc_addresses_cmd+=" --public-ips ${public_ips_array[$((i - 1))]}"
         desc_addresses_cmd_output=$(eval $desc_addresses_cmd | jq '.Addresses[] | (.PublicIp,.PrivateIpAddress,.AllocationId)')
