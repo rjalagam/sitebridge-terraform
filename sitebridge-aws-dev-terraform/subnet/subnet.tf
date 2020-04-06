@@ -10,11 +10,11 @@ variable "vpc_id" {
 }
 
 variable "subnet_cidr" {
-  type = list(string)
+  type = "list"
 }
 
 variable "availability_zone" {
-  type = list(string)
+  type = "list"
 }
 
 variable "tags" {
@@ -35,7 +35,7 @@ variable "subnet_name" {
 # Subnet Resource Definitions
 #############################################
 resource "aws_subnet" "sitebridge-subnet" {
-  count                   = ${length(var.subnet_cidr)}
+  count                   = "${length(var.subnet_cidr)}"
   vpc_id                  = "${var.vpc_id}"
   cidr_block              = "${var.subnet_cidr[count.index]}"
   availability_zone       = "${var.availability_zone[count.index]}"
