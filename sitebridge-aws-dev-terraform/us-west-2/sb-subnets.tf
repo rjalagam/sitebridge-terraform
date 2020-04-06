@@ -3,7 +3,7 @@
 # To create a new subnet, follow the below model and add another section subnet
 ##################################################################################################
 variable "availabilityZone" {
-  type    = list(string)
+  type    = "list"
   default = [
     "us-west-2a",
     "us-west-2b",
@@ -40,7 +40,7 @@ variable "subnet1Name" {
 }
 
 variable "subnet1CIDR" {
-  type    = list(string)
+  type    = "list"
   default = [
     "192.168.101.128/27",
     "192.168.101.160/27",
