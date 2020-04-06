@@ -8,10 +8,6 @@ module "sb-us-west-2" {
   instance_type = "${var.instance_type}"
 }
 
-module "sb-us-west-2-customer" {
-  source = "us-west-2.customer"
-}
-
 variable "instance_type" {
   default = "c5.4xlarge"
 }

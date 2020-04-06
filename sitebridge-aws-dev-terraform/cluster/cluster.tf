@@ -6,8 +6,13 @@ variable "vpc_id" {
   description = "VPC ID"
 }
 
-variable "subnet_id" {
+variable "region" {
   type        = "string"
+  description = "Region"
+}
+
+variable "subnet_id" {
+  type        = "list"
   description = "subnet id to create the instance in"
 }
 
@@ -48,6 +53,10 @@ variable "amiList" {
 }
 
 variable "externalIPs" {
+  type = "list"
+}
+
+variable "privateIPs" {
   type = "list"
 }
 
@@ -105,14 +114,8 @@ variable "cloudInitFolder" {
 ########################################################################
 locals {
   sitebridgeNameList                   = ["${var.sitebridge}"]
-  is_external_ip_length_correct        = "${(length(var.externalIPs) == 0 || var.numInstances == length(var.externalIPs)) == true ? 0 : 1}"
   is_ami_list_length_correct           = "${(length(var.amiList) == 0 || var.numInstances == length(var.amiList)) == true ? 0 : 1}"
   is_instance_type_list_length_correct = "${(length(var.instanceTypeList) == 0 || var.numInstances == length(var.instanceTypeList)) == true ? 0 : 1}"
-}
-
-resource "null_resource" "is_external_ip_length_check" {
-  count                                                                                 = "${local.is_external_ip_length_correct}"
-  "ERROR: The var.externalIPs if specified should match the number of var.numInstances" = true
 }
 
 resource "null_resource" "is_ami_list_length_check" {
@@ -125,6 +128,21 @@ resource "null_resource" "is_instance_type_list_length_check" {
   "ERROR: The length of var.instanceTypeList if specified should match the number of var.numInstances" = true
 }
 
+data "external" "get_ips" {
+  program = ["sh", "${path.root}/describe_eip.sh"]
+
+  query = {
+    # arbitrary map from strings to strings, passed
+    # to the external program as the data query.
+    public_ips   = var.externalIPs
+    private_ips  = null
+    prefix_name  = instanceNamePrefix
+    suffix_name  = instanceNameSuffix
+    region       = "${var.region}"
+    set_tags     = "0"
+  }
+}
+
 module "sitebridgeNode" {
   source = "hosts/sitebridgeNode"
 
@@ -132,7 +150,8 @@ module "sitebridgeNode" {
   name                   = "${var.resourceName}"
   amiList                = "${var.amiList}"
   instanceTypeList       = "${var.instanceTypeList}"
-  externalIPs            = "${var.externalIPs}"
+  externalIPs            = "${data.external.get_ips.result["public_ips"]}"
+  privateIPs             = "${data.external.get_ips.result["private_ips"]}"
   instanceNamePrefix     = "${var.instanceNamePrefix}"
   instanceNameSuffix     = "${var.instanceNameSuffix}"
   sitebridgeImage        = "${var.sitebridgeImage}"

@@ -57,9 +57,12 @@ data aws_eip "static_public_ips" {
 # Create a network interface having a private Ip
 resource "aws_network_interface" "private-eni-pool" {
   count             = "${var.instance_count}"
-  subnet_id         = "${var.subnet_id}"
+  subnet_id         = "${var.subnet_id[count.index]}"
   security_groups   = ["${var.vpc_security_group_ids}"]
   source_dest_check = false
+  private_ips       = "${ count.index < length(var.privateIPs) ? list(var.privateIPs[count.index]) : null }"
+  private_ip        = "${ count.index < length(var.privateIPs) ? var.privateIPs[count.index] : null }"
+  private_ips_count = 0
 
   tags {
     Terraform = "true"

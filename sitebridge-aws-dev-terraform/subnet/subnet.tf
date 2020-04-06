@@ -10,11 +10,11 @@ variable "vpc_id" {
 }
 
 variable "subnet_cidr" {
-  default = ""
+  type = list(string)
 }
 
 variable "availability_zone" {
-  default = ""
+  type = list(string)
 }
 
 variable "tags" {
@@ -35,9 +35,10 @@ variable "subnet_name" {
 # Subnet Resource Definitions
 #############################################
 resource "aws_subnet" "sitebridge-subnet" {
+  count                   = ${length(var.subnet_cidr)}
   vpc_id                  = "${var.vpc_id}"
-  cidr_block              = "${var.subnet_cidr}"
-  availability_zone       = "${var.availability_zone}"
+  cidr_block              = "${var.subnet_cidr[count.index]}"
+  availability_zone       = "${var.availability_zone[count.index]}"
   tags                    = "${merge(var.tags, map("Name", format("%s", "${var.subnet_name}")))}"
   map_public_ip_on_launch = false
 }
@@ -73,13 +74,13 @@ resource "aws_route_table_association" "sitebridge-subnet-route-table-associatio
 #############################################
 # Subnets
 output "subnetID" {
-  description = "List of IDs of public subnets"
-  value       = "${aws_subnet.sitebridge-subnet.id}"
+  description = "List of IDs of private subnets"
+  value       = "${aws_subnet.sitebridge-subnet.*.id}"
 }
 
-output "public_subnets_cidr_blocks" {
-  description = "List of cidr_blocks of public subnets"
-  value       = ["${aws_subnet.sitebridge-subnet.cidr_block}"]
+output "private_subnets_cidr_blocks" {
+  description = "List of cidr_blocks of private subnets"
+  value       = ["${aws_subnet.sitebridge-subnet.*.cidr_block}"]
 }
 
 output "public_route_table_ids" {

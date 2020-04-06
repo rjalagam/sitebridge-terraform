@@ -3,7 +3,13 @@
 # To create a new subnet, follow the below model and add another section subnet
 ##################################################################################################
 variable "availabilityZone" {
-  default = "us-west-2a"
+  type    = list(string)
+  default = [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ]
 }
 
 ########################################################################
@@ -34,12 +40,18 @@ variable "subnet1Name" {
 }
 
 variable "subnet1CIDR" {
-  default = "192.168.101.128/25"
+  type    = list(string)
+  default = [
+    "192.168.101.128/27",
+    "192.168.101.160/27",
+    "192.168.101.192/27",
+    "192.168.101.224/27"
+  ]
 }
 
 module "subnet-1" {
   source            = "../subnet"
-  subnet_name       = "${var.vpcName}-${var.subnet1Name}"
+  subnet_name       = "${var.vpcName}-${var.subnet1Name}-count.index"
   vpc_id            = "${aws_vpc.sitebridge-vpc.id}"
   subnet_cidr       = "${var.subnet1CIDR}"
   availability_zone = "${var.availabilityZone}"
