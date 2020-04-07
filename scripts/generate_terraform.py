@@ -56,6 +56,7 @@ def save_terraform_config(cfg_file_path, cfg_data):
 	with open(cfg_file_path, 'w') as fh:
 		fh.write(cfg_data)
 
+
 with open(INPUT_CLUSTER_YAML_FILE, 'r') as stream:
     list_of_clusters = []
     try:
@@ -84,10 +85,9 @@ with open(INPUT_CLUSTER_YAML_FILE, 'r') as stream:
     else:
         cloud_init_provider = DEFAULT_CLOUD_INIT_PROVIDER
 
-    list_of_clusters= yaml_cluster_data[YAML_KEY_CLUSTERS]
+    list_of_clusters = yaml_cluster_data[YAML_KEY_CLUSTERS]
     for cluster_info in list_of_clusters:
         for cluster, cluster_values in cluster_info.items():
-            print(cluster, cluster_values)
             if YAML_KEY_REGION in cluster_values:
                 region = cluster_values[YAML_KEY_REGION]
             else:
@@ -98,17 +98,20 @@ with open(INPUT_CLUSTER_YAML_FILE, 'r') as stream:
 
             if YAML_KEY_AMI_TYPE in cluster_values:
                 ami_list = cluster_values[YAML_KEY_AMI_TYPE]
-                #print(ami_type)
-
-            ami_list = ami_list[:num_instances]
-
+            # number of instances is less than global ami list, then default the remaining ami list
+            if len(ami_list) < num_instances:
+                print("WARNING: number of elements in the ami list is less than the number of "
+                "instances specified. The remaining elements in the list are defaulting")
+                ami_list += [DEFAULT_AMI_TYPE] * (num_instances - len(ami_list))
+            else:
+                ami_list = ami_list[:num_instances]
 
             if YAML_KEY_INSTANCE_TYPE in cluster_values:
                 instance_type = cluster_values[YAML_KEY_INSTANCE_TYPE]
-
             instance_type_list = [instance_type] * num_instances
 
             if YAML_KEY_CLOUD_INIT_PROVIDER in cluster_values:
                 cloud_init_provider = cluster_values[YAML_KEY_CLOUD_INIT_PROVIDER]
             cloud_init_provider_list = [cloud_init_provider] * num_instances
-            generate_per_cluster_terraform(cluster, region, ami_list, instance_type_list, num_instances, cloud_init_provider_list)
+            generate_per_cluster_terraform(cluster, region, ami_list, instance_type_list,
+                                           num_instances, cloud_init_provider_list)
