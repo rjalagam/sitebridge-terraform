@@ -38,11 +38,9 @@ variable "aws_usw2_sb_{{cluster_name}}1_ami_list" {
   type = "list"
 
   default = [
-    "{{ami_type}}",
-    "{{ami_type}}",
-    "{{ami_type}}",
-    "{{ami_type}}",
-    "{{ami_type}}",
+  {{#ami_list | enum}}
+    "{{.1}}",
+  {{/ami_list}}
   ]
 }
 
@@ -50,11 +48,9 @@ variable "aws_usw2_sb_{{cluster_name}}1_instance_type_list" {
   type = "list"
 
   default = [
-    "{{instance_type}}",
-    "{{instance_type}}",
-    "{{instance_type}}",
-    "{{instance_type}}",
-    "{{instance_type}}",
+  {{#instance_type | enum}}
+    "{{.1}}",
+  {{/instance_type}}
   ]
 }
 
@@ -62,16 +58,9 @@ variable "aws_usw2_sb_{{cluster_name}}1_cloud_init_folder" {
   type = "list"
 
   default = [
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
-    "{{cloud_init_provider}}",
+  {{#cloud_init_provider | enum}}
+    "{{.1}}",
+  {{/cloud_init_provider}}
   ]
 }
 

@@ -1,15 +1,26 @@
+---
+global_config:
+  ami:
+  - osrb
+  - ami-02f059d9e8bb5d532
+  num_instances: 3
+  instance_type: c5.8xlarge
+clusters:
 - argus:
     region: us-east-1
     instance_type: c5.8xlarge
     num_instances: 3
-    ami_type: osrb
-- git:
-   region: us-west-2
-   instance_type: c5.4xlarge
-   num_instances: 5
-   ami_type: osrb
-- edge:
-   region: us-east-2
-   instance_type: c5.8xlarge
-   num_instances: 4
-   ami_type: osrb
+- git: 
+    region: us-west-2
+    instance_type: c5.4xlarge
+    num_instances: 5
+    ami:
+     - osrb
+     - osrb
+- edge: 
+    region: us-east-2
+    instance_type: c5.8xlarge
+    num_instances: 4
+    ami:
+      - osrb
+      - custom
